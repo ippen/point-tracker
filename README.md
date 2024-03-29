@@ -49,7 +49,7 @@ https://github.com/ippen/point-tracker/assets/103518421/bc487559-819c-4f8d-8121-
 ## Example
 
 ```
-python point_tracking.py input_video.mp4 --save
+python point_tracker.py input_video.mp4 --save
 ```
 
 This command will track points in `input_video.mp4` and save the tracked points data and the output video with tracked points if the `--save` flag is set.
