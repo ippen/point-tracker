@@ -6,7 +6,7 @@ import argparse
 
 class LucasKanadeTracker:
     def __init__(self, first_frame, selected_points,
-                 win_size = 30, max_level = 10, criteria = (cv2.TERM_CRITERIA_EPS|cv2.TERM_CRITERIA_COUNT, 5, 0.05)):
+                 win_size = 30, max_level = 5, criteria = (cv2.TERM_CRITERIA_EPS|cv2.TERM_CRITERIA_COUNT, 10, 0.05)):
         """
         Initialize the Lucas-Kanade tracker with the first frame and selected points.
         
@@ -14,8 +14,8 @@ class LucasKanadeTracker:
         - first_frame (numpy.ndarray): The first frame of the video.
         - selected_points (list): List of selected points to track. Each point is a tuple (x, y).
         - win_size (int, optional): Size of the window for the Lucas-Kanade method. Default is 30.
-        - max_level (int, optional): Maximum pyramid level number. Default is 3.
-        - criteria (tuple, optional): Criteria for the termination of the iterative process. Default is (cv2.TERM_CRITERIA_EPS|cv2.TERM_CRITERIA_COUNT, 10, 0.03).
+        - max_level (int, optional): Maximum pyramid level number. Default is 5.
+        - criteria (tuple, optional): Criteria for the termination of the iterative process of the Lucas-Kanade method. Default is (cv2.TERM_CRITERIA_EPS|cv2.TERM_CRITERIA_COUNT, 10, 0.05).
         """
         self.frame_gray_prev = cv2.cvtColor(first_frame, cv2.COLOR_BGR2GRAY)
         self.points_prev = np.array(selected_points, dtype=np.float32).reshape(-1, 1, 2)
