@@ -9,6 +9,11 @@ This script implements point tracking in a video using the Lucas-Kanade method. 
 - Output options: The script can create an output video with tracked points and save the tracked points data to a JSON file.
 - Command-line interface: Easy-to-use command-line interface with options to specify input and output files.
 
+## Demo
+
+https://github.com/ippen/point-tracker/assets/103518421/bc487559-819c-4f8d-8121-33ea7627517a
+
+
 ## Requirements
 
 - Python 3.x
