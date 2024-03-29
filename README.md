@@ -1,6 +1,6 @@
-# Point Tracking
+# Point Tracker
 
-This script implements point tracking in a video using the Lucas-Kanade method. It allows users to select points on the first frame of a video interactively and tracks them across subsequent frames.
+This repository contains a Python script for point tracking in videos using the Lucas-Kanade method. Users can select points interactively on the first frame of a video, and the script tracks these points across subsequent frames, visualizing them on the video. It also provides options to save the tracked points data to a JSON file and create an output video with tracked points.
 
 ## Features
 
