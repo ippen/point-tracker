@@ -36,7 +36,7 @@ https://github.com/ippen/point-tracker/assets/103518421/bc487559-819c-4f8d-8121-
 3. Run the script with the following command:
 
     ```
-    python point_tracking.py <video_path> [options]
+    python point_tracker.py <video_path> [options]
     ```
 
     Replace `<video_path>` with the path to your input video file.
@@ -44,13 +44,13 @@ https://github.com/ippen/point-tracker/assets/103518421/bc487559-819c-4f8d-8121-
 ## Command-line Options
 
 - `-o, --output_video`: Path to the output tracked video file. If not provided, the default output file will be `<input_video_name>_tracked.mp4`.
-- `-j, --json_file`: Path to the JSON file to save the tracked points data. If not provided, the default JSON file will be `<input_video_name>_tracked_points.json`.
+- `-j, --json_file`: Path to the JSON file to save the tracked points data. If not provided, the default JSON file will be `<input_video_name>_points.json`.
 - `-n, --no_video`: Flag to disable the creation of the output video. If set, the script will only save the tracked points data to the JSON file.
 
 ## Example
 
 ```
-python point_tracking.py input_video.mp4 -o output_video.mp4 -j tracked_points.json
+python point_tracker.py input_video.mp4 -o output_video.mp4 -j tracked_points.json
 ```
 
 This command will track points in `input_video.mp4`, create an output video with tracked points named `output_video.mp4`, and save the tracked points data to `tracked_points.json`.
