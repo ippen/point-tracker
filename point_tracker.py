@@ -1,137 +1,165 @@
-import cv2 as cv 
+import cv2 
 import numpy as np
 import json
 import argparse
-import os
 
-# Global variables to store points and their IDs
-selected_points = []
-point_id_counter = 0
-point_id_map = {}
-points_data_all_frames = {}
 
-def select_points(event, x, y, flags, param):
-    global selected_points, point_id_counter
-    frame = param
-    if event == cv.EVENT_LBUTTONDOWN:
-        point_id_counter += 1
-        selected_points.append((point_id_counter, x, y))
-        point_id_map[point_id_counter] = (x, y)
-        for point in selected_points:
-            cv.circle(frame, (point[1], point[2]), 5, (128, 255, 0), -1)
-            cv.putText(frame, str(point[0]), (point[1] + 10, point[2] - 10), cv.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv.LINE_AA)
-        cv.imshow('Select Points', frame)
+class LucasKanadeTracker:
+    def __init__(self, first_frame, selected_points,
+                 win_size = 30, max_level = 10, criteria = (cv2.TERM_CRITERIA_EPS|cv2.TERM_CRITERIA_COUNT, 5, 0.05)):
+        """
+        Initialize the Lucas-Kanade tracker with the first frame and selected points.
+        
+        Args:
+        - first_frame (numpy.ndarray): The first frame of the video.
+        - selected_points (list): List of selected points to track. Each point is a tuple (x, y).
+        - win_size (int, optional): Size of the window for the Lucas-Kanade method. Default is 30.
+        - max_level (int, optional): Maximum pyramid level number. Default is 3.
+        - criteria (tuple, optional): Criteria for the termination of the iterative process. Default is (cv2.TERM_CRITERIA_EPS|cv2.TERM_CRITERIA_COUNT, 10, 0.03).
+        """
+        self.frame_gray_prev = cv2.cvtColor(first_frame, cv2.COLOR_BGR2GRAY)
+        self.points_prev = np.array(selected_points, dtype=np.float32).reshape(-1, 1, 2)
+        self.win_size = win_size
+        self.max_level = max_level
+        self.criteria = criteria
 
-def lucas_kanade(video_path, output_video_path, json_file_path, create_video=True): 
-    """
-    Track points in a video using the Lucas-Kanade method.
+    def track(self, frame_cur):
+        """
+        Track points in the current frame using the Lucas-Kanade method.
 
-    Args:
-    - video_path (str): Path to the input video file.
-    - output_video_path (str): Path to save the output tracked video file.
-    - json_file_path (str): Path to save the tracked points data in JSON format.
-    - create_video (bool, optional): Flag to enable or disable the creation of the output video. Default is True.
+        Args:
+        - frame_cur (numpy.ndarray): The current frame of the video.
 
-    The function reads the input video file from 'video_path' and tracks points using the Lucas-Kanade method.
-    It allows the user to select points on the first frame interactively.
-    The tracked points are visualized on the video frames.
-    The tracked points data for each frame is saved to a JSON file specified by 'json_file_path'.
-    If 'create_video' is True, the function also saves the video with tracked points to 'output_video_path'.
-    """
-    # Read video 
-    video_cap_obj = cv.VideoCapture(video_path)
-    frame_width = int(video_cap_obj.get(3))
-    frame_height = int(video_cap_obj.get(4))
-    fps = int(video_cap_obj.get(cv.CAP_PROP_FPS))
+        Returns:
+        - points_cur_converted (list): List of tracked points in the current frame. Each point is a tuple (x, y).
+        - status (numpy.ndarray): Status array indicating whether the flow for the corresponding points has been found. 1 indicates found, 0 indicates not found.
+        """
+        frame_gray_cur = cv2.cvtColor(frame_cur, cv2.COLOR_BGR2GRAY)
+        points_cur, status, _ = cv2.calcOpticalFlowPyrLK(self.frame_gray_prev, frame_gray_cur, self.points_prev, None, winSize=(self.win_size, self.win_size), maxLevel=self.max_level, criteria=self.criteria)
+        self.frame_gray_prev = frame_gray_cur.copy()
+        self.points_prev = points_cur.reshape(-1, 1, 2)
 
-    lucas_kanade_params = dict(winSize=(30, 30),
-                             maxLevel=3,
-                             criteria=(cv.TERM_CRITERIA_EPS|cv.TERM_CRITERIA_COUNT, 10, 0.03))
+        points_cur_converted = []
+        for i, point_cur in enumerate(points_cur):
+            x_cur, y_cur = point_cur.ravel()
+            point_cur = (int(x_cur), int(y_cur))
+            points_cur_converted.append(point_cur)
 
-    # Find features to track 
-    _, frame_first = video_cap_obj.read()
-    frame_gray_prev = cv.cvtColor(frame_first, cv.COLOR_BGR2GRAY)
+        return points_cur_converted, status
 
-    # Allow user to select points on the first frame
-    global selected_points, point_id_map
+
+def select_points_on_frame(frame):
     selected_points = []
-    point_id_map = {}
-    cv.namedWindow('Select Points', cv.WINDOW_NORMAL)  # Set window to be resizable
-    cv.setMouseCallback('Select Points', select_points, param=frame_first)
+    def _select_points(event, x, y, flags, param):
+        nonlocal selected_points
+        if event == cv2.EVENT_LBUTTONDOWN:
+            selected_points.append((x, y))
+            for id, point in enumerate(selected_points):
+                cv2.circle(frame, point, 5, (128, 255, 0), -1)
+                cv2.putText(frame, str(id), (point[0] + 10, point[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.imshow('Select Points', frame)
+    
+    cv2.namedWindow('Select Points', cv2.WINDOW_NORMAL)  # Set window to be resizable
+    cv2.setMouseCallback('Select Points', _select_points, param=frame)
     while True:
-        cv.imshow('Select Points', frame_first)
-        cv.setWindowProperty('Select Points', cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)  # Set window to full screen
-        key = cv.waitKey(10)
+        cv2.imshow('Select Points', frame)
+        cv2.setWindowProperty('Select Points', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        key = cv2.waitKey(10)
         if key == ord('q'):
             break
-    cv.destroyAllWindows()
+    cv2.destroyAllWindows()
 
-    corners_prev = np.array([(point[1], point[2]) for point in selected_points], dtype=np.float32).reshape(-1, 1, 2)
+    return selected_points
 
-    # Define the codec and create VideoWriter object if create_video is True
-    out = None
-    if create_video:
-        out = cv.VideoWriter(output_video_path, cv.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
 
-    frame_points_dict = {}
-    # Loop through each video frame 
-    frame_index = 0
-    while True: 
+def get_first_video_frame(video_path):
+    video_cap_obj = cv2.VideoCapture(video_path)
+    ret, first_frame = video_cap_obj.read()
+    return first_frame
+
+
+def draw_point_on_frame(frame, point, id):
+    cv2.circle(frame, point, 5, (128, 255, 0), -1)
+    cv2.putText(frame, str(id), (point[0] + 10, point[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+
+
+def track_points(video_path, save=False):
+    """
+    Track points in the video using the Lucas-Kanade method. The user can select points to track on the first frame of the video.
+    
+    Args:
+    - video_path (str): Path to the input video file.
+    - save (bool, optional): Flag to save the tracked points data, and the output video with tracked points. Default is False.
+    """
+    first_frame = get_first_video_frame(video_path)
+    selected_points = select_points_on_frame(first_frame.copy())
+    
+    lucas_kanade_tracker = LucasKanadeTracker(first_frame, selected_points)
+
+    # Load video
+    video_cap_obj = cv2.VideoCapture(video_path)
+    frame_width = int(video_cap_obj.get(3))
+    frame_height = int(video_cap_obj.get(4))
+    fps = int(video_cap_obj.get(cv2.CAP_PROP_FPS))
+
+    # Initialization
+    ret, first_frame = video_cap_obj.read()
+    for id, point in enumerate(selected_points):
+        draw_point_on_frame(first_frame, point, id)
+    cv2.imshow('Video', first_frame)
+    cv2.setWindowProperty('Video', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    # Wait for a bit to show the first frame
+    cv2.waitKey(500)
+
+    wait_time = int(1/fps * 1000)
+
+    if save:
+        out = None
+        json_data = {}
+        output_video_path = video_path.split('.')[0] + '_tracked.mp4'
+        out = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
+        out.write(first_frame)
+        json_data[0] = {id: {'x': x, 'y': y} for id, (x, y) in enumerate(selected_points)}
+
+    frame_index = 1
+
+    # Continue tracking points in the video
+    while True:
         ret, frame = video_cap_obj.read()
         if not ret:
             break
-        frame_gray_cur = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-        corners_cur, found_status, _ = cv.calcOpticalFlowPyrLK(frame_gray_prev, frame_gray_cur, corners_prev, None, **lucas_kanade_params)
 
-        for i, cur_corner in enumerate(corners_cur):
-            if found_status[i] == 0:
+        points_cur, status = lucas_kanade_tracker.track(frame)
+
+        for i, point_cur in enumerate(points_cur):
+            if status[i] == 0:
                 continue
-            x_cur, y_cur = cur_corner.ravel()
-            cv.circle(frame, (int(x_cur), int(y_cur)), 5, (128, 255, 0), -1)
-            cv.putText(frame, str(selected_points[i][0]), (int(x_cur) + 10, int(y_cur) - 10), cv.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv.LINE_AA)
-            if frame_index not in frame_points_dict:
-                frame_points_dict[frame_index] = []
-            frame_points_dict[frame_index].append({selected_points[i][0]: {'x': int(x_cur), 'y': int(y_cur)}})
+            draw_point_on_frame(frame, point_cur, i)
+        
+        cv2.imshow('Video', frame)
+        cv2.waitKey(wait_time)
 
-        if create_video:
-            out.write(frame)  # Write frame with tracked points to video
-
-        cv.imshow('Video', frame)
-        cv.setWindowProperty('Video', cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)  # Set window to full screen
-        cv.waitKey(15)
+        if save:
+            out.write(frame)
+            json_data[frame_index] = {id: {'x': x, 'y': y} for id, (x, y) in enumerate(points_cur) if status[id] == 1}
 
         frame_index += 1
-        frame_gray_prev = frame_gray_cur.copy()
-        corners_prev = corners_cur.reshape(-1, 1, 2)
     
-    # Release VideoWriter object if it was created
-    if out:
-        out.release()
-
-    # Release VideoCapture object
     video_cap_obj.release()
+    cv2.destroyAllWindows()
+    
+    if save:
+        out.release()
+        json_file_path = video_path.split('.')[0] + '_points.json'
+        with open(json_file_path, 'w') as f:
+            json.dump(json_data, f, indent=4)
 
-    # Close all OpenCV windows
-    cv.destroyAllWindows()
 
-    # Save points data to a json file
-    with open(json_file_path, 'w') as f:
-        json.dump(frame_points_dict, f, indent=4)
-
-def get_output_video_path(video_path):
-    # Get base file name without extension
-    base_name = os.path.splitext(os.path.basename(video_path))[0]
-    return f"{base_name}_tracked.mp4"
 
 if __name__ == '__main__': 
     parser = argparse.ArgumentParser(description='Track points using Lucas-Kanade method')
     parser.add_argument('video_path', type=str, help='Path to the input video file')
-    parser.add_argument('-o', '--output_video', type=str, default='', help='Path to the output tracked video file')
-    parser.add_argument('-j', '--json_file', type=str, default='', help='Path to the JSON file to save the tracked points data')
-    parser.add_argument('-n', '--no_video', action='store_true', help='Flag to disable output video creation')
+    parser.add_argument('-s', '--save', action='store_true', help='Flag to save the tracked points data, and the output video with tracked points')
+
     args = parser.parse_args()
-
-    output_video_path = args.output_video if args.output_video else get_output_video_path(args.video_path)
-    json_file_path = args.json_file if args.json_file else output_video_path.split('.')[0] + '_points.json'
-
-    lucas_kanade(args.video_path, output_video_path, json_file_path, not args.no_video)
+    track_points(args.video_path, args.save)
